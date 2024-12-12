@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-
+import matplotlib.pyplot as plt
 # Set random seed for reproducibility
 np.random.seed(42)
 
@@ -71,8 +71,11 @@ for i in range(number_of_cars):
     service_end_time = service_start_time + service_time
 
     # Update idle time for pump
-    if service_start_time > last_pump_free_time[pump]:
-        pump_idle_time[pump] += service_start_time - last_pump_free_time[pump]
+    #Working
+    # if service_start_time > last_pump_free_time[pump]:
+    #     pump_idle_time[pump] += service_start_time - last_pump_free_time[pump]
+    if service_start_time >= last_pump_free_time[pump]:
+        pump_idle_time[pump] = service_start_time - last_pump_free_time[pump]
 
     # Record event
     event = {
@@ -99,4 +102,60 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 
 # Display the resulting DataFrame
+df.to_excel("output.xlsx", index=False)
+
+data = df
+#                           -------------------
+# 1. Average service time of cars in the three categories
+avg_service_time = data.groupby('car_category')['service_time'].mean()
+
+# 2. Average waiting time in the queues for each pump, and all cars
+avg_waiting_time_by_pump = data.groupby('pump')['waiting_time'].mean()
+avg_waiting_time_all = data['waiting_time'].mean()
+
+# 3. Maximum queue length for each pump (approximated as cars waiting for service at the same pump)
+queue_lengths = data.groupby('pump').size()
+
+# 4. Probability that a car waits for each pump
+prob_wait_by_pump = data[data['waiting_time'] > 0].groupby('pump').size() / data.groupby('pump').size()
+
+# 5. Portion of idle time of each pump
+total_idle_time_by_pump = data.groupby('pump')['cumulative_pump_idle_time'].sum()
+total_time = data['service_end_time'].max()  # Assuming service_end_time covers all events
+idle_time_portion = total_idle_time_by_pump / total_time
+
+# Visualization
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+fig.suptitle('Petrol Station Multi-Channel Queue')
+
+# Plot 1: Average service time by car category
+axes[0, 0].bar(avg_service_time.index, avg_service_time.values, color='blue', alpha=0.7)
+axes[0, 0].set_title('Average Service Time by Car Category')
+axes[0, 0].set_xlabel('Car Category')
+axes[0, 0].set_ylabel('Average Service Time')
+
+# Plot 2: Average waiting time by pump
+axes[0, 1].bar(avg_waiting_time_by_pump.index, avg_waiting_time_by_pump.values, color='green', alpha=0.7)
+axes[0, 1].set_title('Average Waiting Time by Pump')
+axes[0, 1].set_xlabel('Pump Type')
+axes[0, 1].set_ylabel('Average Waiting Time')
+
+# Plot 3: Maximum queue length by pump
+axes[1, 0].bar(queue_lengths.index, queue_lengths.values, color='orange', alpha=0.7)
+axes[1, 0].set_title('Maximum Queue Length by Pump')
+axes[1, 0].set_xlabel('Pump Type')
+axes[1, 0].set_ylabel('Queue Length')
+
+# Plot 4: Portion of idle time by pump
+axes[1, 1].bar(idle_time_portion.index, idle_time_portion.values, color='red', alpha=0.7)
+axes[1, 1].set_title('Portion of Idle Time by Pump')
+axes[1, 1].set_xlabel('Pump Type')
+axes[1, 1].set_ylabel('Idle Time Portion')
+
+plt.tight_layout(rect=[0, 0, 1, 0.96])
+plt.show()
+
+# Print results
+avg_service_time, avg_waiting_time_by_pump, avg_waiting_time_all, queue_lengths, prob_wait_by_pump, idle_time_portion
+
 print(df)
